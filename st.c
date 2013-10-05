@@ -470,8 +470,8 @@ static void selscroll(int, int);
 static void selsnap(int *, int *, int);
 static int x2col(int);
 static int y2row(int);
-static void getbuttoninfo(XEvent *);
-static void mousereport(XEvent *);
+static void getbuttoninfo(XButtonEvent *);
+static void mousereport(XButtonEvent *);
 
 static size_t utf8decode(char *, Rune *, size_t);
 static Rune utf8decodebyte(char, size_t *);
@@ -857,15 +857,15 @@ selsnap(int *x, int *y, int direction)
 }
 
 void
-getbuttoninfo(XEvent *e)
+getbuttoninfo(XButtonEvent *e)
 {
 	int type;
-	uint state = e->xbutton.state & ~(Button1Mask | forceselmod);
+	uint state = e->state & ~(Button1Mask | forceselmod);
 
 	sel.alt = IS_SET(MODE_ALTSCREEN);
 
-	sel.oe.x = x2col(e->xbutton.x);
-	sel.oe.y = y2row(e->xbutton.y);
+	sel.oe.x = x2col(e->x);
+	sel.oe.y = y2row(e->y);
 	selnormalize();
 
 	sel.type = SEL_REGULAR;
@@ -878,16 +878,16 @@ getbuttoninfo(XEvent *e)
 }
 
 void
-mousereport(XEvent *e)
+mousereport(XButtonEvent *e)
 {
-	int x = x2col(e->xbutton.x), y = y2row(e->xbutton.y),
-	    button = e->xbutton.button, state = e->xbutton.state,
+	int x = x2col(e->x), y = y2row(e->y),
+	    button = e->button, state = e->state,
 	    len;
 	char buf[40];
 	static int ox, oy;
 
 	/* from urxvt */
-	if (e->xbutton.type == MotionNotify) {
+	if (e->type == MotionNotify) {
 		if (x == ox && y == oy)
 			return;
 		if (!IS_SET(MODE_MOUSEMOTION) && !IS_SET(MODE_MOUSEMANY))
@@ -900,18 +900,18 @@ mousereport(XEvent *e)
 		ox = x;
 		oy = y;
 	} else {
-		if (!IS_SET(MODE_MOUSESGR) && e->xbutton.type == ButtonRelease) {
+		if (!IS_SET(MODE_MOUSESGR) && e->type == ButtonRelease) {
 			button = 3;
 		} else {
 			button -= Button1;
 			if (button >= 3)
 				button += 64 - 3;
 		}
-		if (e->xbutton.type == ButtonPress) {
+		if (e->type == ButtonPress) {
 			oldbutton = button;
 			ox = x;
 			oy = y;
-		} else if (e->xbutton.type == ButtonRelease) {
+		} else if (e->type == ButtonRelease) {
 			oldbutton = 3;
 			/* MODE_MOUSEX10: no button release reporting */
 			if (IS_SET(MODE_MOUSEX10))
@@ -930,7 +930,7 @@ mousereport(XEvent *e)
 	if (IS_SET(MODE_MOUSESGR)) {
 		len = snprintf(buf, sizeof(buf), "\033[<%d;%d;%d%c",
 				button, x+1, y+1,
-				e->xbutton.type == ButtonRelease ? 'm' : 'M');
+				e->type == ButtonRelease ? 'm' : 'M');
 	} else if (x < 223 && y < 223) {
 		len = snprintf(buf, sizeof(buf), "\033[M%c%c%c",
 				32+button, 32+x+1, 32+y+1);
@@ -942,33 +942,34 @@ mousereport(XEvent *e)
 }
 
 void
-bpress(XEvent *e)
+bpress(XEvent *ev)
 {
+	XButtonEvent *e = &ev->xbutton;
 	struct timespec now;
 	MouseShortcut *ms;
 
-	if (IS_SET(MODE_MOUSE) && !(e->xbutton.state & forceselmod)) {
+	if (IS_SET(MODE_MOUSE) && !(e->state & forceselmod)) {
 		mousereport(e);
 		return;
 	}
 
 	for (ms = mshortcuts; ms < mshortcuts + LEN(mshortcuts); ms++) {
-		if (e->xbutton.button == ms->b
-				&& match(ms->mask, e->xbutton.state)) {
+		if (e->button == ms->b
+				&& match(ms->mask, e->state)) {
 			ttysend(ms->s, strlen(ms->s));
 			return;
 		}
 	}
 
-	if (e->xbutton.button == Button1) {
+	if (e->button == Button1) {
 		clock_gettime(CLOCK_MONOTONIC, &now);
 
 		/* Clear previous selection, logically and visually. */
 		selclear(NULL);
 		sel.mode = SEL_EMPTY;
 		sel.type = SEL_REGULAR;
-		sel.oe.x = sel.ob.x = x2col(e->xbutton.x);
-		sel.oe.y = sel.ob.y = y2row(e->xbutton.y);
+		sel.oe.x = sel.ob.x = x2col(e->x);
+		sel.oe.y = sel.ob.y = y2row(e->y);
 
 		/*
 		 * If the user clicks below predefined timeouts specific
@@ -1266,19 +1267,20 @@ xsetsel(char *str, Time t)
 }
 
 void
-brelease(XEvent *e)
+brelease(XEvent *ev)
 {
-	if (IS_SET(MODE_MOUSE) && !(e->xbutton.state & forceselmod)) {
+	XButtonEvent *e = &ev->xbutton;
+	if (IS_SET(MODE_MOUSE) && !(e->state & forceselmod)) {
 		mousereport(e);
 		return;
 	}
 
-	if (e->xbutton.button == Button2) {
+	if (e->button == Button2) {
 		selpaste(NULL);
-	} else if (e->xbutton.button == Button1) {
+	} else if (e->button == Button1) {
 		if (sel.mode == SEL_READY) {
 			getbuttoninfo(e);
-			selcopy(e->xbutton.time);
+			selcopy(e->time);
 		} else
 			selclear(NULL);
 		sel.mode = SEL_IDLE;
@@ -1287,11 +1289,12 @@ brelease(XEvent *e)
 }
 
 void
-bmotion(XEvent *e)
+bmotion(XEvent *ev)
 {
+	XButtonEvent *e = &ev->xbutton;
 	int oldey, oldex, oldsby, oldsey;
 
-	if (IS_SET(MODE_MOUSE) && !(e->xbutton.state & forceselmod)) {
+	if (IS_SET(MODE_MOUSE) && !(e->state & forceselmod)) {
 		mousereport(e);
 		return;
 	}
