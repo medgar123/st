@@ -1159,7 +1159,7 @@ void
 selpaste(const Arg *dummy)
 {
 	XConvertSelection(xw.dpy, XA_PRIMARY, sel.xtarget, XA_PRIMARY,
-			xw.win, CurrentTime);
+	                  xw.win, CurrentTime);
 }
 
 void
@@ -1198,60 +1198,52 @@ selclear(XEvent *e)
 }
 
 void
-selrequest(XEvent *e)
+selrequest(XEvent *ev)
 {
-	XSelectionRequestEvent *xsre;
-	XSelectionEvent xev;
-	Atom xa_targets, string, clipboard;
+	XSelectionRequestEvent *e = &ev->xselectionrequest;
+	XEvent xev = {.xselection = {
+		.type = SelectionNotify, .requestor = e->requestor,
+		.selection = e->selection, .target = e->target,
+		.time = e->time,
+		.property = None /* reject */
+	}};
 	char *seltext;
 
-	xsre = (XSelectionRequestEvent *) e;
-	xev.type = SelectionNotify;
-	xev.requestor = xsre->requestor;
-	xev.selection = xsre->selection;
-	xev.target = xsre->target;
-	xev.time = xsre->time;
-	if (xsre->property == None)
-		xsre->property = xsre->target;
+	if (e->property == None)
+		e->property = e->target;
 
-	/* reject */
-	xev.property = None;
-
-	xa_targets = XInternAtom(xw.dpy, "TARGETS", 0);
-	if (xsre->target == xa_targets) {
+	if (e->target == XInternAtom(xw.dpy, "TARGETS", 0)) {
 		/* respond with the supported type */
-		string = sel.xtarget;
-		XChangeProperty(xsre->display, xsre->requestor, xsre->property,
+		XChangeProperty(e->display, e->requestor, e->property,
 				XA_ATOM, 32, PropModeReplace,
-				(uchar *) &string, 1);
-		xev.property = xsre->property;
-	} else if (xsre->target == sel.xtarget || xsre->target == XA_STRING) {
+				(uchar *) sel.xtarget, 1);
+		xev.xselection.property = e->property;
+	} else if (e->target == sel.xtarget || e->target == XA_STRING) {
 		/*
 		 * xith XA_STRING non ascii characters may be incorrect in the
 		 * requestor. It is not our problem, use utf8.
 		 */
-		clipboard = XInternAtom(xw.dpy, "CLIPBOARD", 0);
-		if (xsre->selection == XA_PRIMARY) {
+		if (e->selection == XA_PRIMARY) {
 			seltext = sel.primary;
-		} else if (xsre->selection == clipboard) {
+		} else if (e->selection == XInternAtom(xw.dpy, "CLIPBOARD", 0)) {
 			seltext = sel.clipboard;
 		} else {
 			fprintf(stderr,
 				"Unhandled clipboard selection 0x%lx\n",
-				xsre->selection);
+				e->selection);
 			return;
 		}
 		if (seltext != NULL) {
-			XChangeProperty(xsre->display, xsre->requestor,
-					xsre->property, xsre->target,
+			XChangeProperty(e->display, e->requestor,
+					e->property, e->target,
 					8, PropModeReplace,
 					(uchar *)seltext, strlen(seltext));
-			xev.property = xsre->property;
+			xev.xselection.property = e->property;
 		}
 	}
 
 	/* all done, send a notification to the listener */
-	if (!XSendEvent(xsre->display, xsre->requestor, 1, 0, (XEvent *) &xev))
+	if (!XSendEvent(e->display, e->requestor, 1, 0, &xev))
 		fprintf(stderr, "Error sending SelectionNotify event\n");
 }
 
@@ -4166,20 +4158,21 @@ kpress(XEvent *ev)
 
 
 void
-cmessage(XEvent *e)
+cmessage(XEvent *ev)
 {
+	XClientMessageEvent *e = &ev->xclient;
 	/*
 	 * See xembed specs
 	 *  http://standards.freedesktop.org/xembed-spec/xembed-spec-latest.html
 	 */
-	if (e->xclient.message_type == xw.xembed && e->xclient.format == 32) {
-		if (e->xclient.data.l[1] == XEMBED_FOCUS_IN) {
+	if (e->message_type == xw.xembed && e->format == 32) {
+		if (e->data.l[1] == XEMBED_FOCUS_IN) {
 			xw.state |= WIN_FOCUSED;
 			xseturgency(0);
-		} else if (e->xclient.data.l[1] == XEMBED_FOCUS_OUT) {
+		} else if (e->data.l[1] == XEMBED_FOCUS_OUT) {
 			xw.state &= ~WIN_FOCUSED;
 		}
-	} else if (e->xclient.data.l[0] == xw.wmdeletewin) {
+	} else if (e->data.l[0] == xw.wmdeletewin) {
 		/* Send SIGHUP to shell */
 		kill(pid, SIGHUP);
 		exit(0);
@@ -4204,12 +4197,13 @@ cresize(int width, int height)
 }
 
 void
-resize(XEvent *e)
+resize(XEvent *ev)
 {
-	if (e->xconfigure.width == xw.w && e->xconfigure.height == xw.h)
+	XConfigureEvent *e = &ev->xconfigure;
+	if (e->width == xw.w && e->height == xw.h)
 		return;
 
-	cresize(e->xconfigure.width, e->xconfigure.height);
+	cresize(e->width, e->height);
 	ttyresize();
 }
 
