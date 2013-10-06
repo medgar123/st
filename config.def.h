@@ -161,42 +161,25 @@ static MouseShortcut mshortcuts[] = {
 	{ Button5,      XK_ANY_MOD,     "\005" },
 };
 
-/* Internal keyboard shortcuts. */
-static Shortcut shortcuts[] = {
-	/* mask                 keysym          function        argument */
-	{ XK_ANY_MOD,           XK_Break,       sendbreak,      {.i =  0} },
-	{ ControlMask,          XK_Print,       toggleprinter,  {.i =  0} },
-	{ ShiftMask,            XK_Print,       printscreen,    {.i =  0} },
-	{ XK_ANY_MOD,           XK_Print,       printsel,       {.i =  0} },
-	{ MODKEY|ShiftMask,     XK_Prior,       xzoom,          {.f = +1} },
-	{ MODKEY|ShiftMask,     XK_Next,        xzoom,          {.f = -1} },
-	{ MODKEY|ShiftMask,     XK_Home,        xzoomreset,     {.f =  0} },
-	{ ShiftMask,            XK_Insert,      selpaste,       {.i =  0} },
-	{ MODKEY|ShiftMask,     XK_Insert,      clippaste,      {.i =  0} },
-	{ MODKEY|ShiftMask,     XK_C,           clipcopy,       {.i =  0} },
-	{ MODKEY|ShiftMask,     XK_V,           clippaste,      {.i =  0} },
-	{ MODKEY,               XK_Num_Lock,    numlock,        {.i =  0} },
-};
-
 /*
- * Special keys (change & recompile st.info accordingly)
+ * Keyboard shortcuts and special keys.
  *
- * Mask value:
- * * Use XK_ANY_MOD to match the key no matter modifiers state
- * * Use XK_NO_MOD to match the key alone (no modifiers)
- * appkey value:
- * * 0: no value
- * * > 0: keypad application mode enabled
- * *   = 2: term.numlock = 1
- * * < 0: keypad application mode disabled
- * appcursor value:
- * * 0: no value
- * * > 0: cursor application mode enabled
- * * < 0: cursor application mode disabled
- * crlf value
- * * 0: no value
- * * > 0: crlf mode is enabled
- * * < 0: crlf mode is disabled
+ * mask value:
+ * * Use XK_ANY_MOD to match the key disregarding modifier state.
+ * * Use XK_NO_MOD to match the key alone (no modifiers).
+ *
+ * Conditions may be given to match the current terminal mode.
+ * A missing (zero) condition does not participate in the match.
+ *
+ * .appkey = +1: keypad application mode enabled
+ * .appkey = +2: term.numlock = 1
+ * .appkey = -1: keypad application mode disabled
+ *
+ * .appcursor = +1: cursor application mode enabled
+ * .appcursor = -1: cursor application mode disabled
+ *
+ * .crlf = +1: crlf mode is enabled
+ * .crlf = -1: crlf mode is disabled
  *
  * Be careful with the order of the definitions because st searches in
  * this table sequentially, so any XK_ANY_MOD must be in the last
@@ -221,6 +204,21 @@ static uint forceselmod = ShiftMask;
  * world. Please decide about changes wisely.
  */
 static Key key[] = {
+	/* keysym           mask                  function                argument  */
+	{ XK_Break,         XK_ANY_MOD,           .func = sendbreak       },
+	{ XK_Print,         ControlMask,          .func = toggleprinter   },
+	{ XK_Print,         ShiftMask,            .func = printscreen     },
+	{ XK_Print,         XK_ANY_MOD,           .func = printsel        },
+	{ XK_Prior,         MODKEY|ShiftMask,     .func = xzoom,          {.i = +1} },
+	{ XK_Next,          MODKEY|ShiftMask,     .func = xzoom,          {.i = -1} },
+	{ XK_Home,          MODKEY|ShiftMask,     .func = xzoomreset,     },
+	{ XK_Insert,        ShiftMask,            .func = selpaste        },
+	{ XK_Insert,        MODKEY|ShiftMask,     .func = clippaste       },
+	{ XK_C,             MODKEY|ShiftMask,     .func = clipcopy,       },
+	{ XK_V,             MODKEY|ShiftMask,     .func = clippaste,      },
+	{ XK_Num_Lock,      MODKEY,               .func = numlock         },
+
+	/* Special keys (change & recompile st.info accordingly). */
 	/* keysym           mask            string      appkey appcursor crlf */
 	{ XK_KP_Home,       ShiftMask,      "\033[2J",       0,   -1,    0},
 	{ XK_KP_Home,       ShiftMask,      "\033[1;2H",     0,   +1,    0},

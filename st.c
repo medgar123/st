@@ -296,6 +296,8 @@ typedef struct {
 	signed char appkey;    /* application keypad */
 	signed char appcursor; /* application cursor */
 	signed char crlf;      /* crlf mode          */
+	void (*func)(const Arg *);
+	const Arg arg;
 } Key;
 
 typedef struct {
@@ -319,13 +321,6 @@ typedef struct {
 	struct timespec tclick1;
 	struct timespec tclick2;
 } Selection;
-
-typedef struct {
-	uint mod;
-	KeySym keysym;
-	void (*func)(const Arg *);
-	const Arg arg;
-} Shortcut;
 
 /* function definitions used in config.h */
 static void clipcopy(const Arg *);
@@ -450,7 +445,7 @@ static void xresize(int, int);
 static void expose(XExposeEvent *);
 static void visibility(XVisibilityEvent *);
 static void unmap(XUnmapEvent *);
-static char *kmap(KeySym, uint);
+static int kmap(KeySym, uint);
 static void kpress(XKeyEvent *);
 static void cmessage(XClientMessageEvent *);
 static void cresize(int, int);
@@ -4058,7 +4053,7 @@ numlock(const Arg *dummy)
 	term.numlock ^= 1;
 }
 
-char *
+int
 kmap(KeySym k, uint state)
 {
 	Key *kp;
@@ -4081,41 +4076,35 @@ kmap(KeySym k, uint state)
 		if (IS_SET(MODE_CRLF) ? kp->crlf < 0 : kp->crlf > 0)
 			continue;
 
-		return kp->s;
+		if(kp->s)
+			ttysend(kp->s, strlen(kp->s));
+		else if(kp->func)
+			kp->func(&kp->arg);
+		return 1;
 	}
 
-	return NULL;
+	return 0;
 }
 
 void
 kpress(XKeyEvent *e)
 {
 	KeySym ksym;
-	char buf[32], *customkey;
+	char buf[32];
 	int len;
 	Rune c;
 	Status status;
-	Shortcut *bp;
 
 	if (IS_SET(MODE_KBDLOCK))
 		return;
 
 	len = XmbLookupString(xw.xic, e, buf, sizeof buf, &ksym, &status);
-	/* 1. shortcuts */
-	for (bp = shortcuts; bp < shortcuts + LEN(shortcuts); bp++) {
-		if (ksym == bp->keysym && match(bp->mod, e->state)) {
-			bp->func(&(bp->arg));
-			return;
-		}
-	}
 
-	/* 2. custom keys from config.h */
-	if ((customkey = kmap(ksym, e->state))) {
-		ttysend(customkey, strlen(customkey));
+	/* 1. custom keys from config.h */
+	if (kmap(ksym, e->state))
 		return;
-	}
 
-	/* 3. composed string from input method */
+	/* 2. composed string from input method */
 	if (len == 0)
 		return;
 	if (len == 1 && e->state & Mod1Mask) {
