@@ -4058,21 +4058,10 @@ numlock(const Arg *dummy)
 	term.numlock ^= 1;
 }
 
-char*
+char *
 kmap(KeySym k, uint state)
 {
 	Key *kp;
-	int i;
-
-	/* Check for mapped keys out of X11 function keys. */
-	for (i = 0; i < LEN(mappedkeys); i++) {
-		if (mappedkeys[i] == k)
-			break;
-	}
-	if (i == LEN(mappedkeys)) {
-		if ((k & 0xFFFF) < 0xFD00)
-			return NULL;
-	}
 
 	for (kp = key; kp < key + LEN(key); kp++) {
 		if (kp->k != k)
