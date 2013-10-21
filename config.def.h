@@ -145,19 +145,23 @@ static unsigned int mousebg = 0;
 static unsigned int defaultitalic = 11;
 static unsigned int defaultunderline = 7;
 
+#define MODKEY Mod1Mask
+
 /*
  * Internal mouse shortcuts.
  * Beware that overloading Button1 will disable the selection.
  */
 static MouseShortcut mshortcuts[] = {
-	/* button               mask            string */
-	{ Button4,              XK_ANY_MOD,     "\031" },
-	{ Button5,              XK_ANY_MOD,     "\005" },
+	/* button       mask            string or function    condition */
+	{ Button2,      MODKEY,         .func = clippaste,    .release = 1 },
+	{ Button4,      MODKEY,         .func = xzoom, {.i = +5} },
+	{ Button5,      MODKEY,         .func = xzoom, {.i = -5} },
+	{ Button2,      XK_ANY_MOD,     .func = selpaste,     .release = 1 },
+	{ Button4,      XK_ANY_MOD,     "\031" },
+	{ Button5,      XK_ANY_MOD,     "\005" },
 };
 
 /* Internal keyboard shortcuts. */
-#define MODKEY Mod1Mask
-
 static Shortcut shortcuts[] = {
 	/* mask                 keysym          function        argument */
 	{ XK_ANY_MOD,           XK_Break,       sendbreak,      {.i =  0} },

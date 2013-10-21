@@ -272,10 +272,20 @@ typedef struct {
 	int cursor; /* cursor style */
 } XWindow;
 
+typedef union {
+	int i;
+	unsigned int ui;
+	float f;
+	const void *v;
+} Arg;
+
 typedef struct {
 	uint b;
 	uint mask;
 	char *s;
+	int release;
+	void (*func)(const Arg *);
+	const Arg arg;
 } MouseShortcut;
 
 typedef struct {
@@ -309,13 +319,6 @@ typedef struct {
 	struct timespec tclick1;
 	struct timespec tclick2;
 } Selection;
-
-typedef union {
-	int i;
-	uint ui;
-	float f;
-	const void *v;
-} Arg;
 
 typedef struct {
 	uint mod;
@@ -453,6 +456,7 @@ static void cmessage(XClientMessageEvent *);
 static void cresize(int, int);
 static void resize(XConfigureEvent *);
 static void focus(XFocusChangeEvent *);
+static int bmap(XButtonEvent *);
 static void brelease(XButtonEvent *);
 static void bpress(XButtonEvent *);
 static void bmotion(XButtonEvent *);
@@ -915,24 +919,43 @@ mousereport(XButtonEvent *e)
 	ttywrite(buf, len);
 }
 
+int
+bmap(XButtonEvent *e) {
+	MouseShortcut *ms;
+
+	for (ms = mshortcuts; ms < mshortcuts + LEN(mshortcuts); ms++) {
+		if(e->button != ms->b)
+			continue;
+
+		e->state &= ~(Button1Mask | Button2Mask | Button3Mask | Button4Mask | Button5Mask);
+		if(!match(ms->mask, e->state))
+			continue;
+
+		if(e->type != (ms->release ? ButtonRelease : ButtonPress))
+			continue;
+
+		if(ms->s)
+			ttysend(ms->s, strlen(ms->s));
+		else
+			ms->func(&ms->arg);
+
+		return 1;
+	}
+	return 0;
+}
+
 void
 bpress(XButtonEvent *e)
 {
 	struct timespec now;
-	MouseShortcut *ms;
 
 	if (IS_SET(MODE_MOUSE) && !(e->state & forceselmod)) {
 		mousereport(e);
 		return;
 	}
 
-	for (ms = mshortcuts; ms < mshortcuts + LEN(mshortcuts); ms++) {
-		if (e->button == ms->b
-				&& match(ms->mask, e->state)) {
-			ttysend(ms->s, strlen(ms->s));
-			return;
-		}
-	}
+	if(bmap(e))
+		return;
 
 	if (e->button == Button1) {
 		clock_gettime(CLOCK_MONOTONIC, &now);
@@ -1237,9 +1260,10 @@ brelease(XButtonEvent *e)
 		return;
 	}
 
-	if (e->button == Button2) {
-		selpaste(NULL);
-	} else if (e->button == Button1) {
+	if(bmap(e))
+		return;
+
+	if (e->button == Button1) {
 		if (sel.mode == SEL_READY) {
 			getbuttoninfo(e);
 			selcopy(e->time);
