@@ -487,32 +487,6 @@ static char *xstrdup(char *);
 
 static void usage(void);
 
-static void (*handler[LASTEvent])(XEvent *) = {
-	[KeyPress] = kpress,
-	[ClientMessage] = cmessage,
-	[ConfigureNotify] = resize,
-	[VisibilityNotify] = visibility,
-	[UnmapNotify] = unmap,
-	[Expose] = expose,
-	[FocusIn] = focus,
-	[FocusOut] = focus,
-	[MotionNotify] = bmotion,
-	[ButtonPress] = bpress,
-	[ButtonRelease] = brelease,
-/*
- * Uncomment if you want the selection to disappear when you select something
- * different in another window.
- */
-/*	[SelectionClear] = selclear, */
-	[SelectionNotify] = selnotify,
-/*
- * PropertyNotify is only turned on when there is some INCR transfer happening
- * for the selection retrieval.
- */
-	[PropertyNotify] = propnotify,
-	[SelectionRequest] = selrequest,
-};
-
 /* Globals */
 static DC dc;
 static XWindow xw;
@@ -4285,8 +4259,31 @@ run(void)
 				XNextEvent(xw.dpy, &ev);
 				if (XFilterEvent(&ev, None))
 					continue;
-				if (handler[ev.type])
-					(handler[ev.type])(&ev);
+				switch(ev.type) {
+				case KeyPress: kpress(&ev); break;
+				case ClientMessage: cmessage(&ev); break;
+				case ConfigureNotify: resize(&ev); break;
+				case VisibilityNotify: visibility(&ev); break;
+				case UnmapNotify: unmap(&ev); break;
+				case Expose: expose(&ev); break;
+				case FocusIn: focus(&ev); break;
+				case FocusOut: focus(&ev); break;
+				case MotionNotify: bmotion(&ev); break;
+				case ButtonPress: bpress(&ev); break;
+				case ButtonRelease: brelease(&ev); break;
+/*
+ * Uncomment if you want the selection to disappear when you select something
+ * different in another window.
+ */
+/*				case SelectionClear: selclear(&ev); break; */
+				case SelectionNotify: selnotify(&ev); break;
+				case SelectionRequest: selrequest(&ev); break;
+/*
+ * PropertyNotify is only turned on when there is some INCR transfer happening
+ * for the selection retrieval.
+ */
+				case PropertyNotify: propnotify(&ev); break;
+				}
 			}
 
 			draw();
