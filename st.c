@@ -444,22 +444,22 @@ static void xunloadfont(Font *);
 static void xunloadfonts(void);
 static void xresize(int, int);
 
-static void expose(XEvent *);
-static void visibility(XEvent *);
-static void unmap(XEvent *);
+static void expose(XExposeEvent *);
+static void visibility(XVisibilityEvent *);
+static void unmap(XUnmapEvent *);
 static char *kmap(KeySym, uint);
-static void kpress(XEvent *);
-static void cmessage(XEvent *);
+static void kpress(XKeyEvent *);
+static void cmessage(XClientMessageEvent *);
 static void cresize(int, int);
-static void resize(XEvent *);
-static void focus(XEvent *);
-static void brelease(XEvent *);
-static void bpress(XEvent *);
-static void bmotion(XEvent *);
+static void resize(XConfigureEvent *);
+static void focus(XFocusChangeEvent *);
+static void brelease(XButtonEvent *);
+static void bpress(XButtonEvent *);
+static void bmotion(XButtonEvent *);
 static void propnotify(XEvent *);
 static void selnotify(XEvent *);
-static void selclear(XEvent *);
-static void selrequest(XEvent *);
+static void selclear(XSelectionClearEvent *);
+static void selrequest(XSelectionRequestEvent *);
 
 static void selinit(void);
 static void selnormalize(void);
@@ -916,9 +916,8 @@ mousereport(XButtonEvent *e)
 }
 
 void
-bpress(XEvent *ev)
+bpress(XButtonEvent *e)
 {
-	XButtonEvent *e = &ev->xbutton;
 	struct timespec now;
 	MouseShortcut *ms;
 
@@ -1029,10 +1028,9 @@ selcopy(Time t)
 void
 propnotify(XEvent *e)
 {
-	XPropertyEvent *xpev;
 	Atom clipboard = XInternAtom(xw.dpy, "CLIPBOARD", 0);
 
-	xpev = &e->xproperty;
+	XPropertyEvent *xpev = &e->xproperty;
 	if (xpev->state == PropertyNewValue &&
 			(xpev->atom == XA_PRIMARY ||
 			 xpev->atom == clipboard)) {
@@ -1041,7 +1039,7 @@ propnotify(XEvent *e)
 }
 
 void
-selnotify(XEvent *e)
+selnotify(XEvent *ev)
 {
 	ulong nitems, ofs, rem;
 	int format;
@@ -1051,10 +1049,10 @@ selnotify(XEvent *e)
 	incratom = XInternAtom(xw.dpy, "INCR", 0);
 
 	ofs = 0;
-	if (e->type == SelectionNotify) {
-		property = e->xselection.property;
-	} else if(e->type == PropertyNotify) {
-		property = e->xproperty.atom;
+	if (ev->type == SelectionNotify) {
+		property = ev->xselection.property;
+	} else if(ev->type == PropertyNotify) {
+		property = ev->xproperty.atom;
 	} else {
 		return;
 	}
@@ -1070,7 +1068,7 @@ selnotify(XEvent *e)
 			return;
 		}
 
-		if (e->type == PropertyNotify && nitems == 0 && rem == 0) {
+		if (ev->type == PropertyNotify && nitems == 0 && rem == 0) {
 			/*
 			 * If there is some PropertyNotify with no data, then
 			 * this is the signal of the selection owner that all
@@ -1162,7 +1160,7 @@ clippaste(const Arg *dummy)
 }
 
 void
-selclear(XEvent *e)
+selclear(XSelectionClearEvent *e)
 {
 	if (sel.ob.x == -1)
 		return;
@@ -1172,9 +1170,8 @@ selclear(XEvent *e)
 }
 
 void
-selrequest(XEvent *ev)
+selrequest(XSelectionRequestEvent *e)
 {
-	XSelectionRequestEvent *e = &ev->xselectionrequest;
 	XEvent xev = {.xselection = {
 		.type = SelectionNotify, .requestor = e->requestor,
 		.selection = e->selection, .target = e->target,
@@ -1233,9 +1230,8 @@ xsetsel(char *str, Time t)
 }
 
 void
-brelease(XEvent *ev)
+brelease(XButtonEvent *e)
 {
-	XButtonEvent *e = &ev->xbutton;
 	if (IS_SET(MODE_MOUSE) && !(e->state & forceselmod)) {
 		mousereport(e);
 		return;
@@ -1255,9 +1251,8 @@ brelease(XEvent *ev)
 }
 
 void
-bmotion(XEvent *ev)
+bmotion(XButtonEvent *e)
 {
-	XButtonEvent *e = &ev->xbutton;
 	int oldey, oldex, oldsby, oldsey;
 
 	if (IS_SET(MODE_MOUSE) && !(e->state & forceselmod)) {
@@ -3973,21 +3968,19 @@ drawregion(int x1, int y1, int x2, int y2)
 }
 
 void
-expose(XEvent *ev)
+expose(XExposeEvent *e)
 {
 	redraw();
 }
 
 void
-visibility(XEvent *ev)
+visibility(XVisibilityEvent *e)
 {
-	XVisibilityEvent *e = &ev->xvisibility;
-
 	MODBIT(xw.state, e->state != VisibilityFullyObscured, WIN_VISIBLE);
 }
 
 void
-unmap(XEvent *ev)
+unmap(XUnmapEvent *e)
 {
 	xw.state &= ~WIN_VISIBLE;
 }
@@ -4010,14 +4003,12 @@ xseturgency(int add)
 }
 
 void
-focus(XEvent *ev)
+focus(XFocusChangeEvent *e)
 {
-	XFocusChangeEvent *e = &ev->xfocus;
-
 	if (e->mode == NotifyGrab)
 		return;
 
-	if (ev->type == FocusIn) {
+	if (e->type == FocusIn) {
 		XSetICFocus(xw.xic);
 		xw.state |= WIN_FOCUSED;
 		xseturgency(0);
@@ -4084,9 +4075,8 @@ kmap(KeySym k, uint state)
 }
 
 void
-kpress(XEvent *ev)
+kpress(XKeyEvent *e)
 {
-	XKeyEvent *e = &ev->xkey;
 	KeySym ksym;
 	char buf[32], *customkey;
 	int len;
@@ -4132,9 +4122,8 @@ kpress(XEvent *ev)
 
 
 void
-cmessage(XEvent *ev)
+cmessage(XClientMessageEvent *e)
 {
-	XClientMessageEvent *e = &ev->xclient;
 	/*
 	 * See xembed specs
 	 *  http://standards.freedesktop.org/xembed-spec/xembed-spec-latest.html
@@ -4171,9 +4160,8 @@ cresize(int width, int height)
 }
 
 void
-resize(XEvent *ev)
+resize(XConfigureEvent *e)
 {
-	XConfigureEvent *e = &ev->xconfigure;
 	if (e->width == xw.w && e->height == xw.h)
 		return;
 
@@ -4260,24 +4248,24 @@ run(void)
 				if (XFilterEvent(&ev, None))
 					continue;
 				switch(ev.type) {
-				case KeyPress: kpress(&ev); break;
-				case ClientMessage: cmessage(&ev); break;
-				case ConfigureNotify: resize(&ev); break;
-				case VisibilityNotify: visibility(&ev); break;
-				case UnmapNotify: unmap(&ev); break;
-				case Expose: expose(&ev); break;
-				case FocusIn: focus(&ev); break;
-				case FocusOut: focus(&ev); break;
-				case MotionNotify: bmotion(&ev); break;
-				case ButtonPress: bpress(&ev); break;
-				case ButtonRelease: brelease(&ev); break;
+				case KeyPress: kpress(&ev.xkey); break;
+				case ClientMessage: cmessage(&ev.xclient); break;
+				case ConfigureNotify: resize(&ev.xconfigure); break;
+				case VisibilityNotify: visibility(&ev.xvisibility); break;
+				case UnmapNotify: unmap(&ev.xunmap); break;
+				case Expose: expose(&ev.xexpose); break;
+				case FocusIn:
+				case FocusOut: focus(&ev.xfocus); break;
+				case MotionNotify: bmotion(&ev.xbutton); break;
+				case ButtonPress: bpress(&ev.xbutton); break;
+				case ButtonRelease: brelease(&ev.xbutton); break;
 /*
  * Uncomment if you want the selection to disappear when you select something
  * different in another window.
  */
-/*				case SelectionClear: selclear(&ev); break; */
+/*				case SelectionClear: selclear(&ev.xselectionclear); break; */
 				case SelectionNotify: selnotify(&ev); break;
-				case SelectionRequest: selrequest(&ev); break;
+				case SelectionRequest: selrequest(&ev.xselectionrequest); break;
 /*
  * PropertyNotify is only turned on when there is some INCR transfer happening
  * for the selection retrieval.
