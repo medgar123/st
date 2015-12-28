@@ -4054,11 +4054,30 @@ numlock(const Arg *dummy)
 }
 
 int
+kcmp(const void *a, const void *b)
+{
+	const Key *k1 = a, *k2 = b;
+	if (k1->k != k2->k)
+		return k1->k < k2->k ? -1 : 1;
+	else if (k1->mask != k2->mask)
+		return k1->mask < k2->mask ? -1 : 1;
+	else if (k1->appkey != k2->appkey)
+		return k1->appkey ? -1 : 1;
+	else if (k1->appcursor != k2->appcursor)
+		return k1->appcursor ? -1 : 1;
+	else if (k1->crlf != k2->crlf)
+		return k1->crlf ? -1 : 1;
+	return 0;
+}
+
+int
 kmap(KeySym k, uint state)
 {
 	Key *kp;
 
 	for (kp = key; kp < key + LEN(key); kp++) {
+		if (kp->k > k)
+			break;
 		if (kp->k != k)
 			continue;
 
@@ -4376,6 +4395,7 @@ run:
 		if (!opt_title && !opt_line)
 			opt_title = basename(xstrdup(argv[0]));
 	}
+	qsort(key, LEN(key), sizeof(*key), kcmp);
 	setlocale(LC_CTYPE, "");
 	XSetLocaleModifiers("");
 	tnew(MAX(cols, 1), MAX(rows, 1));

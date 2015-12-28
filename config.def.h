@@ -180,10 +180,6 @@ static MouseShortcut mshortcuts[] = {
  *
  * .crlf = +1: crlf mode is enabled
  * .crlf = -1: crlf mode is disabled
- *
- * Be careful with the order of the definitions because st searches in
- * this table sequentially, so any XK_ANY_MOD must be in the last
- * position for a key.
  */
 
 /*
